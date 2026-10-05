@@ -12,10 +12,10 @@ CHAIN = []
 
 # --- Logika Blockchain Voting ---
 
-def new_block(id, vote_data, parent_id=None, parent_hash=None):
+def new_block(id, data, parent_id=None, parent_hash=None):
     return {
         "id": id,
-        "vote_data": vote_data,  # Berisi {"kandidat": "Kandidat A", "voter_id": "V123"}
+        "data": data,
         "parent_id": parent_id,
         "parent_hash": parent_hash,
         "nonce": None,
@@ -75,7 +75,7 @@ def broadcast_block(block):
     for peer in PEERS:
         try:
             kirim_json(f"http://{peer}/block", block)
-            print(f" -> block {block['id']} (Suara Voting) dikirim ke {peer}")
+            print(f" -> block {block['id']} dikirim ke {peer}")
         except Exception as e:
             print(f" !! gagal mengirim ke {peer} ({e})")
 
@@ -87,7 +87,7 @@ def resolve_conflicts():
             kandidat = ambil_json(f"http://{peer}/chain")["chain"]
             if len(kandidat) > len(terpanjang) and is_chain_valid(kandidat):
                 terpanjang = kandidat
-                print(f" -> rantai suara lebih panjang ditemukan di {peer} ({len(kandidat)} block)")
+                print(f" -> rantai lebih panjang di {peer} ({len(kandidat)} block)")
         except Exception as e:
             print(f" !! gagal menghubungi {peer} ({e})")
     
@@ -118,10 +118,10 @@ class NodeHandler(BaseHTTPRequestHandler):
             berubah = resolve_conflicts()
             self._balas(200, {"rantai_diganti": berubah, "panjang": len(CHAIN)})
         elif self.path == "/tally":
-            # Perhitungan Hasil Suara Voting (Tallying)
             rekap = {}
-            for block in CHAIN[1:]:  # Lompati Genesis Block
-                kandidat = block["vote_data"].get("kandidat", "Tidak Valid")
+            for block in CHAIN[1:]:
+                v_data = block.get("data") or block.get("vote_data") or {}
+                kandidat = v_data.get("kandidat", "Tidak Valid") if isinstance(v_data, dict) else "Tidak Valid"
                 rekap[kandidat] = rekap.get(kandidat, 0) + 1
             self._balas(200, {"total_suara": len(CHAIN) - 1, "rekap_suara": rekap})
         else:
@@ -145,10 +145,10 @@ class NodeHandler(BaseHTTPRequestHandler):
             )
             nonce, hasil = mine_block(block)
             if nonce is None:
-                self._balas(500, {"error": "gagal menambang block suara"})
+                self._balas(500, {"error": "gagal menambang block"})
                 return
             CHAIN.append(block)
-            print(f"[{PORT}] Suara untuk '{vote_data['kandidat']}' ditambang (Block {block['id']}), nonce {nonce}, hash {hasil[:20]}...")
+            print(f"[{PORT}] block {block['id']} ditambang, nonce {nonce}, hash {hasil[:20]}...")
             broadcast_block(block)
             self._balas(201, {"pesan": "suara berhasil masuk ke blockchain", "block": block})
 
@@ -163,11 +163,11 @@ class NodeHandler(BaseHTTPRequestHandler):
             )
             if sah:
                 CHAIN.append(block)
-                print(f"[{PORT}] Suara dari peer diterima (Block {block['id']})")
-                self._balas(200, {"pesan": "suara diterima"})
+                print(f"[{PORT}] block {block['id']} diterima dari peer")
+                self._balas(200, {"pesan": "block diterima"})
             else:
-                print(f"[{PORT}] Suara DITOLAK (Block {block.get('id')} tidak valid)")
-                self._balas(409, {"pesan": "suara ditolak"})
+                print(f"[{PORT}] block {block.get('id')} DITOLAK")
+                self._balas(409, {"pesan": "block ditolak"})
 
         elif self.path == "/peers":
             peer_baru = isi.get("peer")
