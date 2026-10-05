@@ -1,6 +1,4 @@
-Berikut adalah teks lengkap untuk berkas `README.md` yang siap Anda salin dan gunakan di direktori proyek `praktikum1b/`:
-
-```markdown
+```
 # 🗳️ Voting Blockchain Terdistribusi (Praktikum 2)
 
 Proyek ini merupakan implementasi *blockchain* terdistribusi berbasis Python untuk jaringan pemungutan suara (*voting system*) independen tanpa bergantung pada *framework* pihak ketiga maupun koordinator pusat[cite: 3]. Seluruh komunikasi antar-node dikembangkan menggunakan pustaka standar Python (`http.server` & `urllib.request`) guna mensimulasikan mekanisme konsensus terdistribusi, penyebaran suara (*broadcast*), *longest-chain rule*, dan pertahanan *Proof of Work*[cite: 3].
