@@ -1,4 +1,4 @@
-# client.py -- Alat bantu perintah voting
+# client.py -- Alat bantu perintah voting UNTAD
 import json
 import sys
 import urllib.error
@@ -32,7 +32,7 @@ def ringkas(chain):
             kandidat = str(v_data)
             voter = "-"
             
-        detail = f"Kandidat: {kandidat} | Voter: {voter}"
+        detail = f"Kandidat: {kandidat} | Voter NIM: {voter}"
         print(f"  Block {block['id']} | nonce: {str(block['nonce']).ljust(8)} | parent_hash: {induk} | {detail}")
 
 if __name__ == "__main__":
@@ -41,11 +41,10 @@ if __name__ == "__main__":
 
     if perintah == "vote":
         kandidat = sys.argv[3] if len(sys.argv) > 3 else "Paslon 1"
-        voter = sys.argv[4] if len(sys.argv) > 4 else "Voter123"
+        voter = sys.argv[4].upper().strip() if len(sys.argv) > 4 else "F55125001"
 
-        # Validasi Paslon di sisi Client
         if kandidat not in PASLON_VALID:
-            print(f"Pilihan Gagal! '{kandidat}' tidak terdaftar. Pilihan valid: {', '.join(PASLON_VALID)}")
+            print(f"Pilihan Gagal! '{kandidat}' tidak terdaftar. Pilihan resmi: {', '.join(PASLON_VALID)}")
             sys.exit(1)
 
         try:
@@ -53,7 +52,7 @@ if __name__ == "__main__":
             print(f"{hasil['pesan']}: Block {hasil['block']['id']}")
         except urllib.error.HTTPError as e:
             err_msg = json.loads(e.read().decode("utf-8"))
-            print(f"Gagal mengirim suara: {err_msg.get('error')}")
+            print(f"Gagal memilih: {err_msg.get('error')}")
 
     elif perintah == "chain":
         hasil = panggil(f"http://{alamat}/chain")
@@ -83,7 +82,7 @@ if __name__ == "__main__":
         terakhir = panggil(f"http://{alamat}/chain")["chain"][-1]
         block_palsu = {
             "id": terakhir["id"] + 1,
-            "data": {"kandidat": "Kandidat Palsu", "voter_id": "Hacker"},
+            "data": {"kandidat": "Paslon 1", "voter_id": "F55125999"},
             "parent_id": terakhir["id"],
             "parent_hash": "0" * 64,
             "nonce": 1,

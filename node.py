@@ -1,4 +1,4 @@
-# node.py -- Node Voting Blockchain Terdistribusi
+# node.py -- Node Voting Blockchain Terdistribusi Universitas Tadulako
 import hashlib
 import json
 import sys
@@ -10,8 +10,41 @@ PORT = 0
 PEERS = []
 CHAIN = []
 
-# Daftar Paslon Resmi
+# --- Aturan & Konfigurasi Voting UNTAD ---
 PASLON_VALID = ["Paslon 1", "Paslon 2"]
+ANGKATAN_VALID = ["23", "24", "25"]  # Angkatan 2023 (Sem 7), 2024 (Sem 5), 2025 (Sem 3)
+FAKULTAS_UNTAD = ["A", "B", "C", "D", "E", "F", "G", "K", "L", "N", "P"] 
+
+def validasi_nim_untad(nim):
+    """
+    Format NIM UNTAD: [Kode Fakultas][3 Digit Prodi][2 Digit Tahun][3 Digit No Urut]
+    Contoh: F55125001 -> Fakultas 'F', Angkatan '25'
+    """
+    nim = nim.upper().strip()
+    if len(nim) < 8:
+        return False, "Format NIM terlalu pendek!"
+    
+    kode_fakultas = nim[0]
+    if kode_fakultas not in FAKULTAS_UNTAD:
+        return False, f"Kode Fakultas '{kode_fakultas}' tidak terdaftar di UNTAD!"
+    
+    # Mengambil 2 digit angkatan dari NIM
+    try:
+        angkatan = nim[4:6] if len(nim) >= 9 else nim[1:3]
+        if angkatan not in ANGKATAN_VALID:
+            return False, f"Angkatan '20{angkatan}' tidak memenuhi syarat (Hanya Semester 3-7 / Angkatan 2023-2025)!"
+    except Exception:
+        return False, "Format NIM UNTAD tidak valid!"
+
+    return True, "Valid"
+
+def voter_sudah_memilih(chain, voter_id):
+    """Mengecek apakah voter_id/NIM sudah pernah memilih di dalam rantai blockchain."""
+    for block in chain[1:]:  # Lompati Genesis Block
+        v_data = block.get("data") or block.get("vote_data") or {}
+        if isinstance(v_data, dict) and v_data.get("voter_id") == voter_id:
+            return True
+    return False
 
 # --- Logika Blockchain Voting ---
 
@@ -45,9 +78,12 @@ def genesis_block():
 def is_chain_valid(chain, difficulty=DIFFICULTY):
     if not chain or chain[0]["parent_hash"] is not None:
         return False
+    
+    voters_seen = set()
     for i in range(1, len(chain)):
         induk = chain[i - 1]
         blok = chain[i]
+        
         if blok["parent_id"] != induk["id"]:
             return False
         if blok["parent_hash"] != compute_hash(induk):
@@ -56,6 +92,15 @@ def is_chain_valid(chain, difficulty=DIFFICULTY):
             return False
         if not compute_hash(blok).startswith(difficulty):
             return False
+            
+        # Validasi kecurangan double voting di dalam rantai
+        v_data = blok.get("data") or blok.get("vote_data") or {}
+        if isinstance(v_data, dict):
+            voter = v_data.get("voter_id")
+            if voter in voters_seen:
+                return False
+            voters_seen.add(voter)
+            
     return True
 
 # --- Komunikasi Antar Node ---
@@ -121,7 +166,7 @@ class NodeHandler(BaseHTTPRequestHandler):
             berubah = resolve_conflicts()
             self._balas(200, {"rantai_diganti": berubah, "panjang": len(CHAIN)})
         elif self.path == "/tally":
-            rekap = {p: 0 for p in PASLON_VALID} # Inisialisasi daftar kandidat resmi
+            rekap = {p: 0 for p in PASLON_VALID}
             for block in CHAIN[1:]:
                 v_data = block.get("data") or block.get("vote_data") or {}
                 kandidat = v_data.get("kandidat") if isinstance(v_data, dict) else None
@@ -138,18 +183,32 @@ class NodeHandler(BaseHTTPRequestHandler):
         if self.path == "/mine":
             induk = CHAIN[-1]
             kandidat_input = isi.get("kandidat", "")
+            voter_input = str(isi.get("voter_id", "")).upper().strip()
             
-            # Validasi Paslon di sisi Server/Node
+            # 1. Validasi Paslon Resmi
             if kandidat_input not in PASLON_VALID:
-                print(f"[{PORT}] DITOLAK: Paslon '{kandidat_input}' tidak valid!")
+                print(f"[{PORT}] DITOLAK: Paslon '{kandidat_input}' tidak terdaftar!")
                 self._balas(400, {
                     "error": f"Kandidat '{kandidat_input}' tidak valid. Pilihan resmi: {', '.join(PASLON_VALID)}"
                 })
                 return
 
+            # 2. Validasi Format & Semester NIM UNTAD
+            nim_valid, pesan_err = validasi_nim_untad(voter_input)
+            if not nim_valid:
+                print(f"[{PORT}] DITOLAK: NIM '{voter_input}' -> {pesan_err}")
+                self._balas(400, {"error": f"NIM '{voter_input}' ditolak: {pesan_err}"})
+                return
+
+            # 3. Validasi Cegah Double Voting
+            if voter_sudah_memilih(CHAIN, voter_input):
+                print(f"[{PORT}] DITOLAK: NIM '{voter_input}' sudah pernah memilih!")
+                self._balas(400, {"error": f"NIM '{voter_input}' sudah menggunakan hak pilihnya!"})
+                return
+
             vote_data = {
                 "kandidat": kandidat_input,
-                "voter_id": isi.get("voter_id", "Anonim")
+                "voter_id": voter_input
             }
             block = new_block(
                 induk["id"] + 1,
@@ -171,20 +230,24 @@ class NodeHandler(BaseHTTPRequestHandler):
             induk = CHAIN[-1]
             v_data = block.get("data") or block.get("vote_data") or {}
             kandidat_block = v_data.get("kandidat") if isinstance(v_data, dict) else None
+            voter_block = v_data.get("voter_id") if isinstance(v_data, dict) else None
             
+            nim_valid, _ = validasi_nim_untad(str(voter_block))
             sah = (
                 block.get("parent_id") == induk["id"]
                 and block.get("parent_hash") == compute_hash(induk)
                 and block.get("nonce") is not None
                 and compute_hash(block).startswith(DIFFICULTY)
                 and kandidat_block in PASLON_VALID
+                and nim_valid
+                and not voter_sudah_memilih(CHAIN, voter_block)
             )
             if sah:
                 CHAIN.append(block)
                 print(f"[{PORT}] block {block['id']} diterima dari peer")
                 self._balas(200, {"pesan": "block diterima"})
             else:
-                print(f"[{PORT}] block {block.get('id')} DITOLAK")
+                print(f"[{PORT}] block {block.get('id')} DITOLAK (tidak valid/double vote)")
                 self._balas(409, {"pesan": "block ditolak"})
 
         elif self.path == "/peers":
@@ -204,7 +267,7 @@ if __name__ == "__main__":
         PEERS = sys.argv[2].split(",")
 
     CHAIN.append(genesis_block())
-    print(f"Node Voting aktif di port {PORT}")
+    print(f"Node Voting UNTAD aktif di port {PORT}")
     print("Peers  : " + (", ".join(PEERS) if PEERS else "(belum ada)"))
     print(f"Genesis: {compute_hash(CHAIN[0])[:20]}...")
 
