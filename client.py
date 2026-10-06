@@ -4,6 +4,8 @@ import sys
 import urllib.error
 import urllib.request
 
+PASLON_VALID = ["Paslon 1", "Paslon 2"]
+
 def panggil(url, data=None):
     if data is None:
         permintaan = urllib.request.Request(url)
@@ -40,8 +42,18 @@ if __name__ == "__main__":
     if perintah == "vote":
         kandidat = sys.argv[3] if len(sys.argv) > 3 else "Paslon 1"
         voter = sys.argv[4] if len(sys.argv) > 4 else "Voter123"
-        hasil = panggil(f"http://{alamat}/mine", {"kandidat": kandidat, "voter_id": voter})
-        print(f"{hasil['pesan']}: Block {hasil['block']['id']}")
+
+        # Validasi Paslon di sisi Client
+        if kandidat not in PASLON_VALID:
+            print(f"Pilihan Gagal! '{kandidat}' tidak terdaftar. Pilihan valid: {', '.join(PASLON_VALID)}")
+            sys.exit(1)
+
+        try:
+            hasil = panggil(f"http://{alamat}/mine", {"kandidat": kandidat, "voter_id": voter})
+            print(f"{hasil['pesan']}: Block {hasil['block']['id']}")
+        except urllib.error.HTTPError as e:
+            err_msg = json.loads(e.read().decode("utf-8"))
+            print(f"Gagal mengirim suara: {err_msg.get('error')}")
 
     elif perintah == "chain":
         hasil = panggil(f"http://{alamat}/chain")

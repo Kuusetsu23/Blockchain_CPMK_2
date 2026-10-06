@@ -10,6 +10,9 @@ PORT = 0
 PEERS = []
 CHAIN = []
 
+# Daftar Paslon Resmi
+PASLON_VALID = ["Paslon 1", "Paslon 2"]
+
 # --- Logika Blockchain Voting ---
 
 def new_block(id, data, parent_id=None, parent_hash=None):
@@ -118,11 +121,12 @@ class NodeHandler(BaseHTTPRequestHandler):
             berubah = resolve_conflicts()
             self._balas(200, {"rantai_diganti": berubah, "panjang": len(CHAIN)})
         elif self.path == "/tally":
-            rekap = {}
+            rekap = {p: 0 for p in PASLON_VALID} # Inisialisasi daftar kandidat resmi
             for block in CHAIN[1:]:
                 v_data = block.get("data") or block.get("vote_data") or {}
-                kandidat = v_data.get("kandidat", "Tidak Valid") if isinstance(v_data, dict) else "Tidak Valid"
-                rekap[kandidat] = rekap.get(kandidat, 0) + 1
+                kandidat = v_data.get("kandidat") if isinstance(v_data, dict) else None
+                if kandidat in rekap:
+                    rekap[kandidat] += 1
             self._balas(200, {"total_suara": len(CHAIN) - 1, "rekap_suara": rekap})
         else:
             self._balas(404, {"error": "endpoint tidak dikenal"})
@@ -133,8 +137,18 @@ class NodeHandler(BaseHTTPRequestHandler):
 
         if self.path == "/mine":
             induk = CHAIN[-1]
+            kandidat_input = isi.get("kandidat", "")
+            
+            # Validasi Paslon di sisi Server/Node
+            if kandidat_input not in PASLON_VALID:
+                print(f"[{PORT}] DITOLAK: Paslon '{kandidat_input}' tidak valid!")
+                self._balas(400, {
+                    "error": f"Kandidat '{kandidat_input}' tidak valid. Pilihan resmi: {', '.join(PASLON_VALID)}"
+                })
+                return
+
             vote_data = {
-                "kandidat": isi.get("kandidat", "Kandidat A"),
+                "kandidat": kandidat_input,
                 "voter_id": isi.get("voter_id", "Anonim")
             }
             block = new_block(
@@ -155,11 +169,15 @@ class NodeHandler(BaseHTTPRequestHandler):
         elif self.path == "/block":
             block = isi
             induk = CHAIN[-1]
+            v_data = block.get("data") or block.get("vote_data") or {}
+            kandidat_block = v_data.get("kandidat") if isinstance(v_data, dict) else None
+            
             sah = (
                 block.get("parent_id") == induk["id"]
                 and block.get("parent_hash") == compute_hash(induk)
                 and block.get("nonce") is not None
                 and compute_hash(block).startswith(DIFFICULTY)
+                and kandidat_block in PASLON_VALID
             )
             if sah:
                 CHAIN.append(block)

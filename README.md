@@ -1,20 +1,19 @@
 
 # 🗳️ Voting Blockchain Terdistribusi (Praktikum 2)
 
-Proyek ini merupakan implementasi *blockchain* terdistribusi berbasis Python untuk jaringan pemungutan suara (*voting system*) independen tanpa bergantung pada *framework* pihak ketiga maupun koordinator pusat[cite: 3]. Seluruh komunikasi antar-node dikembangkan menggunakan pustaka standar Python (`http.server` & `urllib.request`) guna mensimulasikan mekanisme konsensus terdistribusi, penyebaran suara (*broadcast*), *longest-chain rule*, dan pertahanan *Proof of Work*[cite: 3].
+Proyek ini merupakan implementasi *blockchain* terdistribusi berbasis Python untuk jaringan pemungutan suara (*voting system*) independen tanpa bergantung pada *framework* pihak ketiga maupun koordinator pusat[cite: 3]. Seluruh komunikasi antar-node dikembangkan menggunakan pustaka standar Python (`http.server` & `urllib.request`) guna mensimulasikan mekanisme konsensus terdistribusi, penyebaran suara (*broadcast*), *longest-chain rule*, pembatasan kandidat resmi, dan pertahanan *Proof of Work*[cite: 3].
 
 ---
 
 ## 📁 Struktur Direktori
 
-text
+```text
 praktikum1b/
 ├── node.py            # Program utama node blockchain voting (HTTP server & konsensus)
 ├── client.py          # Alat bantu CLI untuk interaksi voting, penambangan, & resolve
 ├── Dockerfile         # Konfigurasi containerization untuk node
-└── docker-compose.yml # Orchestration untuk menjalankan jaringan multi-node (3 container)
-
-
+├── docker-compose.yml # Orchestration untuk menjalankan jaringan multi-node (3 container)
+└── README.md          # Dokumentasi penggunaan
 
 ---
 
